@@ -1,0 +1,402 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+introduction:
+
+who is interested
+where is data
+KM
+modeling
+
+
+```{r}
+library(readxl)
+```
+
+```{r}
+#bd = read_excel('/Users/ritaliu/Desktop/Spring2021/Math_453/project/data_state.xlsx')
+bd = read_excel('/Users/apple/Desktop/data_state.xlsx')
+bd[1] <- NULL
+```
+```{r}
+library(survminer)
+library(survival)
+#library(ggplot2)
+#library(ggmap)         # for mapping points on maps
+#library(tidyverse)     # for data cleaning and plotting
+#library(maps)          # for map data
+#library(leaflet)       # for highly customizable mapping
+```
+
+
+```{r}
+#bd%>%
+  #select(Time,Year,Quarter,State)%>%
+  #group_by(State,Year)%>%
+  #mutate(avgtime=mean(Time))%>%
+  #select(avgtime,Year,State)%>%
+  #top_n(10)%>%
+  #ggplot()+
+  #geom_line(aes(x=Year,y=avgtime), color = "steelblue")+
+  #facet_wrap(vars(State)) +
+  #labs(x = "", 
+       #y = "",
+       #title = "Business Formation Time (in quarters)") +
+  #scale_fill_viridis_d() +
+  #theme(axis.text.y = element_blank())
+  
+```
+
+```{r}
+bd = bd%>%
+  mutate(Education=`Education Attainment (At least some college) in count`)
+
+bd = bd%>%
+  mutate(employment_rate=total_employment/(1000*Population_thousands))
+
+bd = bd%>%
+  mutate(college_rate=Education/(1000*Population_thousands))
+```
+
+```{r}
+bd
+```
+
+## Choose between models 
+
+### model 1: weibull with all covariates
+
+```{r}
+bd$Status = 1
+summary(survreg(Surv(Time,Status)~exp + tax_rev + nontax_rev + real_gdp + personal_income_per_capita + employment_rate + as.factor(Quarter)+ college_rate + Year ,dist='weibull',data=bd))
+```
+
+### model 2: weibull without nontax_rev
+```{r}
+summary(survreg(Surv(Time,Status)~ exp + tax_rev + employment_rate + real_gdp + personal_income_per_capita  + as.factor(Quarter)+ college_rate + Year ,dist='weibull',data=bd))
+```
+
+
+```{r}
+(12 - 486)*2 
+(13 - 487)*2
+```
+
+> According to AIC, the model with all variables is same to the model without nontax_rev. If we were to use weibull model, we could choose the full model.
+
+\
+
+> Explaination of parameters: 
+
+When we look at the p-value for each covariate, we notice that only nontax_revenue's p-value(0.15816)>0.05, all the other covariate has p-value<0.05 so that the relationship between other covariates and the entrepreneurship time is significant.
+
+We can also seperate those covariates into two group:
+
+group 1 (positive coefficients):tax_rev, personal_income_per_capita, college_rate, Year.
+
+So that in group 1, those covariates would make entrepreneurship formation time longer.
+
+tax revenue's effect (which in the government tax revenue) can be interpreted as if government is getting more tax revenue today, people's incentive for forming a firm can be lower as they are worrying that more money would be taken by the government.
+
+personal_income_per_capita's effect can be interpreted as if people is alredy getting their target income, their incentive to start a firm can also be lowered as most people are not risk takers so that they would settle down with a steady income, so that their plans for forming a firm can be pushed back.
+
+college_rate's effect can be interpreted as if they already get a college degree, they have higher probability of getting a good job, unlike those who do not have a college degree, they are not on a all or nothing stage so that they may not be willing to give up those jobs that they already get and fully try to get the company started, they may consider more in tring to start a film, which may delay the formation time.
+
+Year's effect is a little bit tricky, it indicates that the formation time has been longer comparing to the earlier years, but we should also acknowledge that the big recession happened in 2008 and our data is from 2004-2014, so that the longer time can be due to the loss of trust in the economy.
+
+
+group 2(negative coefficients):exp,real_gdp,employment_rate
+
+So that in group 2, those covariates would make entrepreneurship formation time shorter.
+
+exp(expenditure)'s effect can be interpreted as if people's expenditure is increasing, their living cost can be increased, so that they are intending to find other ways to increase their income, thus they are tending to get the firm ready quicker.
+
+real_gdp's effect can be interpreted as people gain faith in the economy so that they would love to try out more possibilities.
+
+?employment_rate's effect can be interpreted as the whole economy is getting in a positive direction so that people may tend to start a company when the economy is great as a whole.
+
+We also treat quarters as factors, and all the coefficients for quarter 2,3,4 are positive, which indicates that in those quarters, people tends to take longer time is firming a company, which can be the incentives to make a change is always the highest in the beginning of a year (quarter 1).
+
+### model 3: lognormal with all variables
+
+```{r}
+summary(survreg(Surv(Time,Status)~exp + tax_rev + nontax_rev + real_gdp + personal_income_per_capita + employment_rate + college_rate + as.factor(Quarter) + Year ,dist='lognormal',data=bd))
+```
+
+### model 4: lognormal without nontax_rev & real_gdp 
+
+```{r}
+summary(survreg(Surv(Time,Status)~ exp + tax_rev  + personal_income_per_capita + employment_rate + college_rate + as.factor(Quarter) + Year ,dist='lognormal',data=bd))
+```
+
+```{r}
+(13 - 601.4)*2 
+(11 - 598 )*2
+```
+
+> If we use lognormal model, we would choose to use the full model since the AIC for this model is lower. 
+
+\
+
+> Since loglikelihood for the lognormal model is larger than that of weibull model and two models (the full versions) have same amount of parameters, according to AIC, the Lognormal model is better. The covariates we would use are: exp, nontax_rev, tax_rev, real_gdp, personal_income_per_capita, employment_rate, eudcation_rate, quarter, and year. 
+
+\
+
+> Explaination of parameters for lognormal model: 
+
+When we look at the p-value for each covariate, we notice that only nontax_revenue's p-value(0.06803)>0.05, all the other covariate has p-value<0.05 so that the relationship between other covariates and the entrepreneurship time is significant.
+
+We can also seperate those covariates into two group:
+
+group 1 (positive coefficients):tax_rev, personal_income_per_capita, college_rate, Year.
+
+So that in group 1, those covariates would make entrepreneurship formation time longer.
+
+tax revenue's effect (which in the government tax revenue) can be interpreted as if government is getting more tax revenue today, people's incentive for forming a firm can be lower as they are worrying that more money would be taken by the government.
+
+personal_income_per_capita's effect can be interpreted as if people is alredy getting their target income, their incentive to start a firm can also be lowered as most people are not risk takers so that they would settle down with a steady income, so that their plans for forming a firm can be pushed back.
+
+college_rate's effect can be interpreted as if they already get a college degree, they have higher probability of getting a good job, unlike those who do not have a college degree, they are not on a all or nothing stage so that they may not be willing to give up those jobs that they already get and fully try to get the company started, they may consider more in tring to start a film, which may delay the formation time.
+
+Year's effect is a little bit tricky, it indicates that the formation time has been longer comparing to the earlier years, but we should also acknowledge that the big recession happened in 2008 and our data is from 2004-2014, so that the longer time can be due to the loss of trust in the economy.
+
+
+group 2(negative coefficients):exp,real_gdp,employment_rate
+
+So that in group 2, those covariates would make entrepreneurship formation time shorter.
+
+exp(expenditure)'s effect can be interpreted as if people's expenditure is increasing, their living cost can be increased, so that they are intending to find other ways to increase their income, thus they are tending to get the firm ready quicker.
+
+real_gdp's effect can be interpreted as people gain faith in the economy so that they would love to try out more possibilities.
+
+?employment_rate's effect can be interpreted as the whole economy is getting in a positive direction so that people may tend to start a company when the economy is great as a whole.
+
+We also treat quarters as factors, and all the coefficients for quarter 2,3,4 are positive, which indicates that in those quarters, people tends to take longer time is firming a company, which can be the incentives to make a change is always the highest in the beginning of a year (quarter 1).
+
+
+```{r}
+data.frame(summary(bd))
+```
+
+```{r}
+# effect of exp/ year = 2008, quarter =1, other = mean
+
+# min
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *5120 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008, 0.0957),xlim=c(1,2.5),ylab="Survival Proporton" , xlab="Formation Time(in quarters)") 
+
+# Q1
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *6802 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'red') 
+
+# Q2
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7521 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'blue') 
+
+# Q3
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *8560 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'purple') 
+
+# max
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *19586 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'orange') 
+
+```
+
+```{r}
+# Q1
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *6802 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(1.1,2.1),ylim=c(0,1),col = 'red',ylab="Survival Proporton" , xlab="Formation Time(in quarters)",main="Business Formation Time (holding expenditure constant)") 
+
+# Q2
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7521 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(1.1,2.1),ylim=c(0,1),add = TRUE,col = 'blue') 
+
+# Q3
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *8560 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(1.1,2.1),ylim=c(0,1),add = TRUE,col = 'purple') 
+```
+
+```{r}
+# effect of education 
+
+# min
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.1269 + 2.65e-02 *2008, 0.0957),xlim=c(1,2.5),ylab="Survival Proporton" , xlab="Formation Time(in quarters)") 
+
+# Q1
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.1729 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'red') 
+
+# Q2
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.1937 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'blue') 
+
+# Q3
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2235 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'purple') 
+
+# max
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.4231 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'orange') 
+```
+
+```{r}
+# Q1
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.1729 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(1.1,2.1),ylim=c(0,1),ylab="Survival Proporton" , xlab="Formation Time(in quarters)",col = 'red',main="Business Formation Time (holding college rate constant)") 
+
+# Q2
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.1937 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(1.1,2.1),ylim=c(0,1),add = TRUE,col = 'blue') 
+
+# Q3
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2235 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(1.1,2.1),ylim=c(0,1),add = TRUE,col = 'purple') 
+```
+
+```{r}
+# effect of tax/ year = 2008, quarter =1, other = mean
+
+# min
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 2335 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008, 0.0957),xlim=c(1,2.5),ylab="Survival Proporton" , xlab="Formation Time(in quarters)") 
+
+# Q1
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 3364 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'red') 
+
+# Q2
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 3840 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'blue') 
+
+# Q3
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4540 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'purple') 
+
+# max
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 14609 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'orange') 
+
+```
+
+
+```{r}
+# effect of real_gdp/ year = 2008, quarter =1, other = mean
+
+# min
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 26614 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008, 0.0957),xlim=c(1,2.5),ylab="Survival Proporton" , xlab="Formation Time(in quarters)") 
+
+# Q1
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 73712 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'red') 
+
+# Q2
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 178486 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'blue') 
+
+# Q3
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 403734 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'purple') 
+
+# max
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 2355040 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'orange') 
+
+```
+
+
+```{r}
+# effect of personal_income/ year = 2008, quarter =1, other = mean
+
+# min
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *17998 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008, 0.0957),xlim=c(1,2.5),ylab="Survival Proporton" , xlab="Formation Time(in quarters)") 
+
+# Q1
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *59665 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'red') 
+
+# Q2
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *155226 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'blue') 
+
+# Q3
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *313185 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'purple') 
+
+# max
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *2075645 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'orange') 
+
+```
+
+```{r}
+# effect of employment_rate/ year = 2008, quarter =1, other = mean
+
+# min
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.4885 +  1.28e+00 * 0.2030 + 2.65e-02 *2008, 0.0957),xlim=c(1,2.5),ylab="Survival Proporton" , xlab="Formation Time(in quarters)") 
+
+# Q1
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.5685 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'red') 
+
+# Q2
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.5979 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'blue') 
+
+# Q3
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6478 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'purple') 
+
+# max
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 1.4399 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'orange') 
+
+```
+
+```{r}
+# Q1
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.5685 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(1.1,2.1),ylim=c(0,1),ylab="Survival Proporton" , xlab="Formation Time(in quarters)",col = 'red',main="Business Formation Time (holding employment rate constant)") 
+
+# Q2
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.5979 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(1.1,2.1),ylim=c(0,1),add = TRUE,col = 'blue') 
+
+# Q3
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6478 +  1.28e+00 * 0.2030 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(1.1,2.1),ylim=c(0,1),add = TRUE,col = 'purple') 
+```
+
+```{r}
+# effect of college_rate/ year = 2008, quarter =1, other = mean
+
+# min
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.1269 + 2.65e-02 *2008, 0.0957),xlim=c(1,2.5),ylab="Survival Proporton" , xlab="Formation Time(in quarters)" ) 
+
+# Q1
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.1729 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'red') 
+
+# Q2
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.1937 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'blue') 
+
+# Q3
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.2235 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'purple') 
+
+# max
+curve (1 - plnorm(x,  -5.25e+01 + -8.62e-06 *7907 + 1.36e-05 * 4160 + 1.10e-05 *2074 +  -1.25e-07 * 308496 + 2.19e-07  *247566 +  -8.78e-01 * 0.6218 +  1.28e+00 * 0.4231 + 2.65e-02 *2008,sd = 0.0957   ),xlim=c(0,2.5),ylim=c(0,1),add = TRUE,col = 'orange') 
+
+```
+
+## KM model
+
+```{r}
+# we can use KM models to compare between Quarters
+km = survfit( Surv(Time) ~ Quarter , data=bd )
+plot(km,col=c("black","red","blue","purple"),ylab="Survival Proporton" , xlab="Formation Time(in quarters)", main="Business Formation Time by different Quarters")
+```
+
+Quarter 1, which is in black, has the lowest survival within all 4 quarters, and this would leads it to have the shortest formation time, while the other three quarters(Q2,Q3,Q4) are tending to have similiar and longer survival than Q1, which mateches with our model's coefficients.
+
+## Cox model 
+```{r}
+# didn't include nontax since if it is included, cox.mph would have error:  system is computationally singular: reciprocal condition number = 2.04324e-16
+m = coxph(Surv(Time,Status)~exp + tax_rev + real_gdp + personal_income_per_capita + employment_rate + college_rate + as.factor(Quarter) + Year,data = bd)
+m
+```
+```{r}
+cox.zph(m)
+```
+```{r}
+plot(cox.zph(m))
+```
+> From residual graph of year, we could see that the log(HR) is always lower than 1, meaning that it's harder and harder to realize a bussiness as time passes but it is even harder at the beiginning years.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
